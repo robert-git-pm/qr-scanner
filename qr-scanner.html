@@ -4,7 +4,6 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>QR Scanner</title>
-<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&display=swap');
 
@@ -67,15 +66,13 @@
     box-shadow: 0 0 0 1px var(--border), 0 0 40px rgba(0,255,136,0.08);
   }
 
-  video, canvas {
+  video {
     position: absolute;
     inset: 0;
     width: 100%;
     height: 100%;
     object-fit: cover;
   }
-
-  canvas { display: none; }
 
   .overlay {
     position: absolute;
@@ -158,7 +155,6 @@
 
 <div class="scanner-wrap" id="scannerWrap">
   <video id="video" autoplay playsinline muted></video>
-  <canvas id="canvas"></canvas>
   <div class="overlay">
     <div class="corner tl"></div>
     <div class="corner tr"></div>
@@ -173,14 +169,13 @@
 
 <script>
 const video = document.getElementById('video');
-const canvas = document.getElementById('canvas');
-const ctx = canvas.getContext('2d');
 const status = document.getElementById('status');
 const startBtn = document.getElementById('startBtn');
 const wrap = document.getElementById('scannerWrap');
 
 let scanning = false;
 let animFrame;
+let detector;
 
 async function startCamera() {
   startBtn.classList.add('hidden');
@@ -189,6 +184,13 @@ async function startCamera() {
 
   if (!window.isSecureContext) {
     status.textContent = 'HTTPS oder localhost erforderlich (aktuell: unsicherer Kontext)';
+    status.className = 'err';
+    startBtn.classList.remove('hidden');
+    return;
+  }
+
+  if (!('BarcodeDetector' in window)) {
+    status.textContent = 'BarcodeDetector nicht unterstützt – bitte Chrome 83+, Edge 83+ oder Safari 17.4+ verwenden';
     status.className = 'err';
     startBtn.classList.remove('hidden');
     return;
@@ -207,6 +209,7 @@ async function startCamera() {
     });
     video.srcObject = stream;
     await video.play();
+    detector = new BarcodeDetector({ formats: ['qr_code'] });
     scanning = true;
     status.textContent = 'QR-Code in den Rahmen halten';
     tick();
@@ -226,22 +229,16 @@ async function startCamera() {
   }
 }
 
-function tick() {
+async function tick() {
   if (!scanning) return;
-  if (video.readyState === video.HAVE_ENOUGH_DATA) {
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    ctx.drawImage(video, 0, 0);
-    const img = ctx.getImageData(0, 0, canvas.width, canvas.height);
-    const code = jsQR(img.data, img.width, img.height, { inversionAttempts: 'dontInvert' });
-
-    if (code) {
-      const data = code.data.trim();
+  try {
+    const codes = await detector.detect(video);
+    if (codes.length > 0) {
+      const data = codes[0].rawValue.trim();
       scanning = false;
       wrap.classList.add('found');
       status.textContent = '✓ QR-Code erkannt – weiterleitung...';
       status.className = 'ok';
-
       setTimeout(() => {
         let url = data;
         if (!/^https?:\/\//i.test(url)) url = 'https://' + url;
@@ -249,8 +246,10 @@ function tick() {
       }, 800);
       return;
     }
+  } catch (e) {
+    // einzelne Frames können fehlschlagen – ignorieren
   }
-  animFrame = requestAnimationFrame(tick);
+  if (scanning) animFrame = requestAnimationFrame(tick);
 }
 </script>
 </body>
