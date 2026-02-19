@@ -73,6 +73,15 @@
     height: 100%;
     object-fit: cover;
   }
+  /* iOS Safari native play overlay ausblenden */
+  video::-webkit-media-controls,
+  video::-webkit-media-controls-enclosure,
+  video::-webkit-media-controls-start-playback-button {
+    display: none !important;
+    -webkit-appearance: none;
+  }
+
+  .scanner-wrap { cursor: pointer; }
 
   .overlay {
     position: absolute;
@@ -153,7 +162,7 @@
 <h1>QR Scanner</h1>
 <p class="sub">// kamera → erkennung → weiterleitung</p>
 
-<div class="scanner-wrap" id="scannerWrap">
+<div class="scanner-wrap" id="scannerWrap" onclick="if(!scanning) startCamera()">
   <video id="video" autoplay playsinline muted></video>
   <div class="overlay">
     <div class="corner tl"></div>
