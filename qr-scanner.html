@@ -187,17 +187,22 @@ async function startCamera() {
   status.textContent = 'Kamera wird gestartet...';
   status.className = '';
 
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    status.textContent = 'Kamera nicht verfügbar (HTTPS oder localhost erforderlich)';
+    status.className = 'err';
+    startBtn.classList.remove('hidden');
+    return;
+  }
+
   try {
     const stream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: 'environment' }
+      video: { facingMode: { ideal: 'environment' } }
     });
     video.srcObject = stream;
-    video.onloadedmetadata = () => {
-      video.play();
-      scanning = true;
-      status.textContent = 'QR-Code in den Rahmen halten';
-      tick();
-    };
+    await video.play();
+    scanning = true;
+    status.textContent = 'QR-Code in den Rahmen halten';
+    tick();
   } catch (e) {
     status.textContent = 'Kamera-Zugriff verweigert';
     status.className = 'err';
