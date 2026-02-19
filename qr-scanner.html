@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>QR Scanner</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&display=swap');
 
@@ -187,8 +187,15 @@ async function startCamera() {
   status.textContent = 'Kamera wird gestartet...';
   status.className = '';
 
+  if (!window.isSecureContext) {
+    status.textContent = 'HTTPS oder localhost erforderlich (aktuell: unsicherer Kontext)';
+    status.className = 'err';
+    startBtn.classList.remove('hidden');
+    return;
+  }
+
   if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-    status.textContent = 'Kamera nicht verfügbar (HTTPS oder localhost erforderlich)';
+    status.textContent = 'Kamera-API nicht verfügbar';
     status.className = 'err';
     startBtn.classList.remove('hidden');
     return;
@@ -204,7 +211,16 @@ async function startCamera() {
     status.textContent = 'QR-Code in den Rahmen halten';
     tick();
   } catch (e) {
-    status.textContent = 'Kamera-Zugriff verweigert';
+    console.error('Kamerafehler:', e.name, e.message);
+    if (e.name === 'NotAllowedError') {
+      status.textContent = 'Berechtigung verweigert – bitte in den Browser-Einstellungen erlauben';
+    } else if (e.name === 'NotFoundError') {
+      status.textContent = 'Keine Kamera gefunden';
+    } else if (e.name === 'NotReadableError') {
+      status.textContent = 'Kamera wird bereits von einer anderen App verwendet';
+    } else {
+      status.textContent = 'Kamerafehler: ' + e.name;
+    }
     status.className = 'err';
     startBtn.classList.remove('hidden');
   }
