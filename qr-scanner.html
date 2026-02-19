@@ -167,6 +167,7 @@
 <p id="status">Kamera inaktiv</p>
 <button id="startBtn" onclick="startCamera()">Kamera starten</button>
 
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
 <script>
 const video = document.getElementById('video');
 const status = document.getElementById('status');
@@ -176,11 +177,25 @@ const wrap = document.getElementById('scannerWrap');
 let scanning = false;
 let animFrame;
 let detector;
+let jsqrCanvas, jsqrCtx;
+const useNative = 'BarcodeDetector' in window;
 
 function showErr(msg) {
   status.textContent = msg;
   status.className = 'err';
   startBtn.classList.remove('hidden');
+}
+
+function handleResult(data) {
+  scanning = false;
+  wrap.classList.add('found');
+  status.textContent = '✓ QR-Code erkannt – weiterleitung...';
+  status.className = 'ok';
+  setTimeout(() => {
+    let url = data;
+    if (!/^https?:\/\//i.test(url)) url = 'https://' + url;
+    window.location.href = url;
+  }, 800);
 }
 
 async function startCamera() {
@@ -194,11 +209,6 @@ async function startCamera() {
       return;
     }
 
-    if (!('BarcodeDetector' in window)) {
-      showErr('BarcodeDetector nicht unterstützt – bitte Chrome 83+, Edge 83+ oder iOS Safari 17.4+ verwenden');
-      return;
-    }
-
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
       showErr('Kamera-API nicht verfügbar – Seite muss über HTTPS geöffnet werden');
       return;
@@ -209,7 +219,14 @@ async function startCamera() {
     });
     video.srcObject = stream;
     await video.play();
-    detector = new BarcodeDetector({ formats: ['qr_code'] });
+
+    if (useNative) {
+      detector = new BarcodeDetector({ formats: ['qr_code'] });
+    } else {
+      jsqrCanvas = document.createElement('canvas');
+      jsqrCtx = jsqrCanvas.getContext('2d');
+    }
+
     scanning = true;
     status.textContent = 'QR-Code in den Rahmen halten';
     tick();
@@ -230,19 +247,16 @@ async function startCamera() {
 async function tick() {
   if (!scanning) return;
   try {
-    const codes = await detector.detect(video);
-    if (codes.length > 0) {
-      const data = codes[0].rawValue.trim();
-      scanning = false;
-      wrap.classList.add('found');
-      status.textContent = '✓ QR-Code erkannt – weiterleitung...';
-      status.className = 'ok';
-      setTimeout(() => {
-        let url = data;
-        if (!/^https?:\/\//i.test(url)) url = 'https://' + url;
-        window.location.href = url;
-      }, 800);
-      return;
+    if (useNative) {
+      const codes = await detector.detect(video);
+      if (codes.length > 0) { handleResult(codes[0].rawValue.trim()); return; }
+    } else {
+      jsqrCanvas.width = video.videoWidth;
+      jsqrCanvas.height = video.videoHeight;
+      jsqrCtx.drawImage(video, 0, 0);
+      const imageData = jsqrCtx.getImageData(0, 0, jsqrCanvas.width, jsqrCanvas.height);
+      const code = jsQR(imageData.data, imageData.width, imageData.height);
+      if (code) { handleResult(code.data.trim()); return; }
     }
   } catch (e) {
     // einzelne Frames können fehlschlagen – ignorieren
