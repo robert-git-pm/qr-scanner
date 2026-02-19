@@ -177,33 +177,33 @@ let scanning = false;
 let animFrame;
 let detector;
 
+function showErr(msg) {
+  status.textContent = msg;
+  status.className = 'err';
+  startBtn.classList.remove('hidden');
+}
+
 async function startCamera() {
-  startBtn.classList.add('hidden');
-  status.textContent = 'Kamera wird gestartet...';
-  status.className = '';
-
-  if (!window.isSecureContext) {
-    status.textContent = 'HTTPS oder localhost erforderlich (aktuell: unsicherer Kontext)';
-    status.className = 'err';
-    startBtn.classList.remove('hidden');
-    return;
-  }
-
-  if (!('BarcodeDetector' in window)) {
-    status.textContent = 'BarcodeDetector nicht unterstützt – bitte Chrome 83+, Edge 83+ oder Safari 17.4+ verwenden';
-    status.className = 'err';
-    startBtn.classList.remove('hidden');
-    return;
-  }
-
-  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-    status.textContent = 'Kamera-API nicht verfügbar';
-    status.className = 'err';
-    startBtn.classList.remove('hidden');
-    return;
-  }
-
   try {
+    startBtn.classList.add('hidden');
+    status.textContent = 'Kamera wird gestartet...';
+    status.className = '';
+
+    if (!window.isSecureContext) {
+      showErr('Seite muss über HTTPS geöffnet werden – lokale Dateien (file://) funktionieren nicht');
+      return;
+    }
+
+    if (!('BarcodeDetector' in window)) {
+      showErr('BarcodeDetector nicht unterstützt – bitte Chrome 83+, Edge 83+ oder iOS Safari 17.4+ verwenden');
+      return;
+    }
+
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      showErr('Kamera-API nicht verfügbar – Seite muss über HTTPS geöffnet werden');
+      return;
+    }
+
     const stream = await navigator.mediaDevices.getUserMedia({
       video: { facingMode: { ideal: 'environment' } }
     });
@@ -216,16 +216,14 @@ async function startCamera() {
   } catch (e) {
     console.error('Kamerafehler:', e.name, e.message);
     if (e.name === 'NotAllowedError') {
-      status.textContent = 'Berechtigung verweigert – bitte in den Browser-Einstellungen erlauben';
+      showErr('Berechtigung verweigert – bitte in den Browser-Einstellungen erlauben');
     } else if (e.name === 'NotFoundError') {
-      status.textContent = 'Keine Kamera gefunden';
+      showErr('Keine Kamera gefunden');
     } else if (e.name === 'NotReadableError') {
-      status.textContent = 'Kamera wird bereits von einer anderen App verwendet';
+      showErr('Kamera wird bereits von einer anderen App verwendet');
     } else {
-      status.textContent = 'Kamerafehler: ' + e.name;
+      showErr('Fehler: ' + e.name + (e.message ? ' – ' + e.message : ''));
     }
-    status.className = 'err';
-    startBtn.classList.remove('hidden');
   }
 }
 
